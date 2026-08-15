@@ -12,7 +12,10 @@ from app.services.simulator import AgentSimulator
 from app.database.connection import engine, Base
 
 # Initialize Database tables
-Base.metadata.create_all(bind=engine)
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as e:
+    print("Database init exception:", e)
 
 app = FastAPI(
     title="AgentShield API",
@@ -29,7 +32,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+@app.get("/api")
 @app.get("/api/health")
+@app.get("/health")
 def health_check():
     return {
         "status": "healthy",
@@ -39,7 +45,8 @@ def health_check():
         "pending_approvals": len(pending_approvals)
     }
 
-@app.post("/api/session/start", response_model=AgentSession)
+@app.post("/api/session/start")
+@app.post("/session/start")
 def start_session(agent_id: str = "Production-Agent-01", task: str = "Customer Data Processing"):
     session_id = f"sess_{str(uuid.uuid4())[:8]}"
     ctx = get_or_create_context(session_id, agent_id)
@@ -52,34 +59,29 @@ def start_session(agent_id: str = "Production-Agent-01", task: str = "Customer D
         current_risk_score=0
     )
 
-@app.post("/api/tool/intercept", response_model=InterceptResponse)
+@app.post("/api/tool/intercept")
+@app.post("/tool/intercept")
 def intercept_tool_request(request: ToolRequest):
-    """
-    Primary endpoint for intercepting tool calls from AI Agents.
-    """
     return interceptor_instance.intercept(request)
 
-@app.post("/api/decision/approve", response_model=InterceptResponse)
+@app.post("/api/decision/approve")
+@app.post("/decision/approve")
 def approve_decision(payload: ApproveDenyRequest):
-    """
-    Human-in-the-Loop approval for pending ASK requests.
-    """
     try:
         return interceptor_instance.approve_pending_request(payload.request_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/api/decision/deny", response_model=InterceptResponse)
+@app.post("/api/decision/deny")
+@app.post("/decision/deny")
 def deny_decision(payload: ApproveDenyRequest):
-    """
-    Human-in-the-Loop denial for pending ASK requests.
-    """
     try:
         return interceptor_instance.deny_pending_request(payload.request_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/api/session/{session_id}")
+@app.get("/session/{session_id}")
 def get_session(session_id: str):
     if session_id not in session_store:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -103,6 +105,7 @@ def get_session(session_id: str):
     }
 
 @app.get("/api/session/{session_id}/actions")
+@app.get("/session/{session_id}/actions")
 def get_session_actions(session_id: str):
     if session_id not in session_store:
         return {"session_id": session_id, "actions": [], "graph": {"nodes": [], "edges": []}}
@@ -114,6 +117,7 @@ def get_session_actions(session_id: str):
     }
 
 @app.get("/api/session/{session_id}/attack-path")
+@app.get("/session/{session_id}/attack-path")
 def get_session_attack_path(session_id: str):
     if session_id not in session_store:
         return {"session_id": session_id, "attack_path": [], "detected": False}
@@ -129,6 +133,7 @@ def get_session_attack_path(session_id: str):
     }
 
 @app.get("/api/session/{session_id}/risk")
+@app.get("/session/{session_id}/risk")
 def get_session_risk(session_id: str):
     if session_id not in session_store:
         return {"session_id": session_id, "risk_score": 0, "level": "LOW"}
@@ -151,6 +156,7 @@ def get_session_risk(session_id: str):
     }
 
 @app.get("/api/audit")
+@app.get("/audit")
 def get_audit_logs():
     return {
         "total_records": len(audit_log_store),
@@ -158,6 +164,7 @@ def get_audit_logs():
     }
 
 @app.get("/api/pending-approvals")
+@app.get("/pending-approvals")
 def get_pending_approvals():
     items = []
     for req_id, data in pending_approvals.items():
@@ -175,22 +182,16 @@ def get_pending_approvals():
 
 # Scenario Endpoints
 @app.post("/api/demo/scenario-1")
+@app.post("/demo/scenario-1")
 def run_scenario_1():
     return AgentSimulator.run_safe_scenario()
 
 @app.post("/api/demo/scenario-2")
+@app.post("/demo/scenario-2")
 def run_scenario_2():
     return AgentSimulator.run_suspicious_scenario()
 
 @app.post("/api/demo/scenario-3")
+@app.post("/demo/scenario-3")
 def run_scenario_3():
-    return AgentSimulator.run_multistep_attack_scenario()
-
-# Backward compatibility routes
-@app.post("/api/demo/benign")
-def trigger_benign_demo():
-    return AgentSimulator.run_safe_scenario()
-
-@app.post("/api/demo/attack")
-def trigger_attack_demo():
     return AgentSimulator.run_multistep_attack_scenario()
