@@ -8,7 +8,7 @@ import { ReasoningCard } from './components/ReasoningCard';
 import { HumanApprovalModal, type PendingRequestItem } from './components/HumanApprovalModal';
 import { AuditLogTable, type AuditLogItem } from './components/AuditLogTable';
 
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 const STEP_DELAY_MS = 1300; // Sequential pacing (~1.3s per step)
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
